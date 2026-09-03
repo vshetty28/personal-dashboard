@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import { Card, EmptyState, ConnectLink } from "./Card";
 import type { CalendarEvent } from "@/lib/google";
 
@@ -28,7 +29,19 @@ export function CalendarCard({
               <span className="w-20 shrink-0 text-muted-foreground">
                 {formatTime(e.start?.dateTime ?? e.start?.date)}
               </span>
-              <span className="text-foreground/90">{e.summary ?? "(No title)"}</span>
+              {e.htmlLink ? (
+                <a
+                  href={e.htmlLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-foreground/90 hover:underline"
+                >
+                  {e.summary ?? "(No title)"}
+                  <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                </a>
+              ) : (
+                <span className="text-foreground/90">{e.summary ?? "(No title)"}</span>
+              )}
               {calendarCount > 1 && (
                 <span className="text-xs text-muted-foreground">{e.calendarName}</span>
               )}

@@ -2,12 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { startOfTodayUTC } from "@/lib/date";
-import { DigestType, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+
+const newsItemSchema = z.object({
+  title: z.string(),
+  source: z.string(),
+  url: z.string(),
+  summary: z.string(),
+  whyItMatters: z.string(),
+});
+
+const marketsItemSchema = newsItemSchema.extend({
+  ticker: z.string(),
+});
+
+const emailAttentionItemSchema = z.object({
+  sender: z.string(),
+  subject: z.string(),
+  whyItMatters: z.string(),
+  deadline: z.string().optional(),
+  nextAction: z.string(),
+});
 
 const ingestSchema = z.object({
-  type: z.enum(["EMAIL", "NEWS", "PORTFOLIO"]),
   date: z.string().date().optional(), // YYYY-MM-DD, defaults to today (UTC)
-  payload: z.record(z.string(), z.unknown()),
+  payload: z.object({
+    topics: z.object({
+      aiLlm: z.array(newsItemSchema),
+      softwareEngineering: z.array(newsItemSchema),
+      spaceDefense: z.array(newsItemSchema),
+      markets: z.array(marketsItemSchema),
+      healthFitness: z.array(newsItemSchema),
+      sports: z.array(newsItemSchema),
+    }),
+    emailAttention: z.array(emailAttentionItemSchema),
+  }),
 });
 
 function isAuthorized(req: NextRequest) {
@@ -28,15 +57,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { type, date, payload } = parsed.data;
+  const { date, payload } = parsed.data;
   const targetDate = date ? new Date(`${date}T00:00:00.000Z`) : startOfTodayUTC();
   const jsonPayload = payload as Prisma.InputJsonObject;
 
-  const digest = await db.digest.upsert({
-    where: { type_date: { type: type as DigestType, date: targetDate } },
-    create: { type: type as DigestType, date: targetDate, payload: jsonPayload },
+  const briefing = await db.briefing.upsert({
+    where: { date: targetDate },
+    create: { date: targetDate, payload: jsonPayload },
     update: { payload: jsonPayload },
   });
 
-  return NextResponse.json({ ok: true, id: digest.id });
+  return NextResponse.json({ ok: true, date: briefing.date });
 }

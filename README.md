@@ -5,9 +5,11 @@ A private, password-gated morning-brief dashboard. One page, two kinds of data:
 - **Live-synced** — fetched fresh on every page load, never cached: Google Calendar
   (supports multiple calendars at once) and TickTick tasks (due today or overdue). These
   always reflect current state, so they're only shown when viewing today.
-- **Agent-pushed** — top emails, tech sector news, and a portfolio snapshot, POSTed once
-  daily to `/api/ingest` by a scheduled agent. Stored per-day, so a date picker on the
-  dashboard lets you browse any past day's digest.
+- **Agent-pushed** — a daily briefing (AI/LLMs, software engineering, space & defense,
+  markets/watchlist news, health & fitness, sports, plus an email attention summary),
+  POSTed once daily to `/api/ingest` by a scheduled agent as one consolidated payload.
+  Stored per-day, so a date picker on the dashboard lets you browse any past day's
+  briefing.
 
 ## Stack
 
@@ -29,7 +31,7 @@ src/
     page.tsx                     dashboard (server component, reads DB + live APIs)
     login/page.tsx                password gate
     api/
-      ingest/route.ts             agent push endpoint (email/news/portfolio)
+      ingest/route.ts             agent push endpoint (the daily briefing)
       calendar/route.ts           JSON endpoint for calendar events
       tasks/route.ts              JSON endpoint for open tasks
       auth/{login,logout}/        session cookie management
@@ -37,15 +39,20 @@ src/
         google/{connect,callback,calendars} Google OAuth flow + calendar listing
         ticktick/{connect,callback} TickTick OAuth flow
   components/
-    dashboard/                     card UI for each widget, including the date picker
+    dashboard/
+      CalendarCard.tsx, TasksCard.tsx    quick-glance cards (today only)
+      BriefingNav.tsx                    jump-nav across the briefing's topics
+      TopicSection.tsx                   one topic's news items (or markets, ticker-tagged)
+      EmailAttentionSection.tsx          the actionable-email list
+      DateNav.tsx, Card.tsx, SignOutButton.tsx
     ui/                            shadcn/ui primitives (button, card, input, badge)
   lib/
     db.ts                         Prisma client singleton
     auth.ts                       session cookie sign/verify
     google.ts                     Calendar OAuth + fetch
     ticktick.ts                   TickTick OAuth + fetch
-    digest-types.ts               payload contracts for /api/ingest
-    date.ts                        UTC "today" helpers (Digest.date key)
+    digest-types.ts               the BriefingPayload contract for /api/ingest
+    date.ts                        UTC "today" helpers (Briefing.date key)
   proxy.ts                        route protection (Next.js 16's middleware convention)
-prisma/schema.prisma               OAuthCredential + Digest models
+prisma/schema.prisma               OAuthCredential + Briefing models
 ```

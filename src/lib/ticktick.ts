@@ -56,6 +56,13 @@ function endOfLocalDay(date: Date) {
   return end;
 }
 
+// Deep-links to a task in TickTick's web app. This URL pattern isn't part of the
+// documented Open API — inferred from the web app's own hash-routing convention —
+// so verify it actually opens the right task once real TickTick data is connected.
+function ticktickTaskUrl(projectId: string, taskId: string) {
+  return `https://ticktick.com/webapp/#p/${projectId}/tasks/${taskId}`;
+}
+
 /**
  * Returns open TickTick tasks due today or earlier (i.e. today's "Today" view —
  * matches TickTick's own smart list, which surfaces overdue tasks alongside
@@ -75,7 +82,7 @@ export async function getTodaysTickTickTasks() {
 
   const now = new Date();
   const cutoff = endOfLocalDay(now);
-  const tasks: (TickTickTask & { projectName: string; overdue: boolean })[] = [];
+  const tasks: (TickTickTask & { projectName: string; overdue: boolean; webLink: string })[] = [];
   for (const project of projects) {
     const res = await fetch(`${API_BASE}/project/${project.id}/data`, {
       headers: { Authorization: `Bearer ${cred.accessToken}` },
@@ -86,7 +93,12 @@ export async function getTodaysTickTickTasks() {
       if (task.status !== 0 || !task.dueDate) continue;
       const dueDate = new Date(task.dueDate);
       if (dueDate > cutoff) continue;
-      tasks.push({ ...task, projectName: project.name, overdue: dueDate < now });
+      tasks.push({
+        ...task,
+        projectName: project.name,
+        overdue: dueDate < now,
+        webLink: ticktickTaskUrl(project.id, task.id),
+      });
     }
   }
 

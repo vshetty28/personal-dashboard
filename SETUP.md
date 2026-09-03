@@ -65,32 +65,63 @@ openssl rand -hex 32   # -> INGEST_API_KEY
 
 ### Ingest contract
 
+One consolidated post per day — the whole daily briefing in one payload, not split by
+topic:
+
 ```
 POST /api/ingest
 Authorization: Bearer <INGEST_API_KEY>
 Content-Type: application/json
 
 {
-  "type": "EMAIL" | "NEWS" | "PORTFOLIO",
   "date": "2026-09-03",   // optional, defaults to today (UTC)
-  "payload": { ... }       // shape depends on type, see src/lib/digest-types.ts
+  "payload": { ... }       // see shape below, and src/lib/digest-types.ts
 }
 ```
 
-Re-posting the same `type` + `date` overwrites that day's digest (upsert), so the agent
-can safely retry or re-run.
+Re-posting the same `date` overwrites that day's briefing (upsert), so the agent can
+safely retry or re-run.
 
 > **"Today" is the UTC calendar date** (see [`src/lib/date.ts`](src/lib/date.ts)), not
-> your local date — the dashboard looks up the digest for `date` omitted = today in UTC.
-> For a US-timezone agent run once each morning this is never actually ambiguous, but if
-> you ever schedule the agent close to UTC midnight, pass `date` explicitly rather than
-> relying on the default.
+> your local date — the dashboard looks up the briefing for `date` omitted = today in
+> UTC. For a US-timezone agent run once each morning this is never actually ambiguous,
+> but if you ever schedule the agent close to UTC midnight, pass `date` explicitly
+> rather than relying on the default.
 
-Payload shapes (see [`src/lib/digest-types.ts`](src/lib/digest-types.ts)):
+Payload shape (validated server-side with zod, see
+[`src/app/api/ingest/route.ts`](src/app/api/ingest/route.ts)):
 
-- **EMAIL**: `{ items: [{ from, subject, snippet, link?, priority? }] }`
-- **NEWS**: `{ items: [{ title, source, url, summary }] }`
-- **PORTFOLIO**: `{ totalValue, dayChange, dayChangePercent, holdings: [{ ticker, shares, price, value, dayChangePercent }] }`
+```ts
+{
+  topics: {
+    aiLlm: NewsItem[],
+    softwareEngineering: NewsItem[],
+    spaceDefense: NewsItem[],
+    markets: MarketsItem[],       // NewsItem + a `ticker` field
+    healthFitness: NewsItem[],
+    sports: NewsItem[],
+  },
+  emailAttention: EmailAttentionItem[],  // [] if nothing needs attention — say so
+                                          // explicitly rather than omitting the field
+}
+
+// NewsItem
+{ title, source, url, summary, whyItMatters }
+
+// MarketsItem
+{ title, source, url, summary, whyItMatters, ticker }   // ticker: "PLTR", or a short
+                                                          // label for a private company
+                                                          // like "SpaceX"
+
+// EmailAttentionItem
+{ sender, subject, whyItMatters, nextAction, deadline? }  // deadline is free text,
+                                                            // e.g. "Fri 9/5", "Today"
+```
+
+Every topic array is expected on every post — send `[]` for a topic with nothing
+noteworthy that day rather than omitting the key. The dashboard renders all 6 topics
+every day (collapsed to just a heading when empty) so you can see at a glance which
+areas the agent covered.
 
 ## 4. Google Calendar
 

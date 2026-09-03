@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { startOfTodayUTC } from "@/lib/date";
-import { DigestType } from "@/generated/prisma/enums";
-import type { Prisma } from "@/generated/prisma/client";
+import { DigestType, type Prisma } from "@prisma/client";
 
 const ingestSchema = z.object({
   type: z.enum(["EMAIL", "NEWS", "PORTFOLIO"]),

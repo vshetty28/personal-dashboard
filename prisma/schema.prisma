@@ -4,11 +4,14 @@
 // 2. Digest - content pushed once a day by the scheduled agent (email digest, tech news, portfolio snapshot)
 
 generator client {
-  provider      = "prisma-client"
-  output        = "../src/generated/prisma"
-  // "native" covers local dev (darwin-arm64 etc.); "rhel-openssl-3.0.x" is what
-  // Vercel's serverless (Lambda) runtime needs — its build container's "native"
-  // detection doesn't match the actual runtime, so it must be listed explicitly.
+  // Classic generator with the default output location (node_modules/@prisma/client)
+  // rather than the newer "prisma-client" ESM generator with a custom `output` path.
+  // The custom-output + custom-tracing combination repeatedly failed to bundle the
+  // query engine into Vercel's serverless functions even with binaryTargets and
+  // outputFileTracingIncludes both set correctly (verified locally, still broken in
+  // prod) — the default location is what Vercel's tracing has first-class,
+  // well-tested support for.
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 

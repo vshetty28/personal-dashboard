@@ -28,14 +28,27 @@ The dashboard is protected by a single shared password (session cookie, signed w
 
 ```bash
 openssl rand -base64 32   # -> AUTH_SECRET
-node -e 'console.log(require("bcryptjs").hashSync(process.argv[1], 10).replace(/\$/g, "\\$"))' "your-password"   # -> ADMIN_PASSWORD_HASH
+node -e 'console.log(require("bcryptjs").hashSync(process.argv[1], 10))' "your-password"   # -> ADMIN_PASSWORD_HASH
 ```
 
-> **Why the `\$` escaping:** bcrypt hashes are full of `$`-delimited segments
-> (`$2b$10$...`). Next.js's `.env` loader expands unescaped `$word` as a
-> reference to another env var — see "Referencing Other Variables" in
-> `node_modules/next/dist/docs/01-app/02-guides/environment-variables.md` — so
-> a raw hash gets silently truncated. The command above pre-escapes it.
+> **Escaping `$` depends on *where* you're setting this — read this carefully, it's easy
+> to get backwards.** bcrypt hashes are full of `$`-delimited segments (`$2b$10$...`).
+> Next.js's env loader expands unescaped `$word` as a reference to another env var (see
+> "Referencing Other Variables" in
+> `node_modules/next/dist/docs/01-app/02-guides/environment-variables.md`) — but only
+> when it's actually parsing a `.env*` **file**. Confirmed empirically (not just from the
+> docs) that this expansion pass runs whenever any `.env*` file exists in the project
+> directory, even for values that arrive as real OS environment variables — so:
+>
+> - **In `.env.local`** (local dev): escape every `$` as `\$`, e.g.
+>   `\$2b\$10\$abc...`. The command above gives you the raw hash — add the backslashes
+>   yourself, or generate it pre-escaped with:
+>   `node -e 'console.log(require("bcryptjs").hashSync(process.argv[1], 10).replace(/\$/g, "\\$"))' "your-password"`
+> - **In the Vercel dashboard** (or any host that injects env vars directly, with no
+>   `.env*` file ever present in the deployed source — which is the case here since
+>   `.env*` is gitignored): paste the **raw, unescaped** hash exactly as the first
+>   command outputs it. Escaping it there will break login, since there's no `.env`
+>   parser running to un-escape it back.
 
 > **Passkey login is a planned follow-up.** The current password gate is intentionally
 > minimal so a WebAuthn/passkey flow (via `@simplewebauthn/server`) can be layered on

@@ -1,0 +1,48 @@
+// Prisma schema for the personal dashboard.
+// Two kinds of data live here:
+// 1. OAuthCredential - tokens for live-synced sources (Google Calendar, TickTick)
+// 2. Digest - content pushed once a day by the scheduled agent (email digest, tech news, portfolio snapshot)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Provider {
+  GOOGLE
+  TICKTICK
+}
+
+// One row per provider (single-user app, so no user relation needed).
+model OAuthCredential {
+  provider     Provider @id
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  scope        String?
+  updatedAt    DateTime @updatedAt
+}
+
+enum DigestType {
+  EMAIL
+  NEWS
+  PORTFOLIO
+}
+
+// Pushed by the daily agent via POST /api/ingest. One row per (type, date) so
+// re-running the ingest job for the same day upserts instead of duplicating.
+model Digest {
+  id        String     @id @default(cuid())
+  type      DigestType
+  date      DateTime   @db.Date
+  payload   Json
+  createdAt DateTime   @default(now())
+
+  @@unique([type, date]) // also serves per-type-per-date lookups; no separate [type, date] index needed
+  @@index([date]) // for "everything on this date" lookups, e.g. the date-picker history view
+}

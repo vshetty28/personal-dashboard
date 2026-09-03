@@ -4,8 +4,12 @@
 // 2. Digest - content pushed once a day by the scheduled agent (email digest, tech news, portfolio snapshot)
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client"
+  output        = "../src/generated/prisma"
+  // "native" covers local dev (darwin-arm64 etc.); "rhel-openssl-3.0.x" is what
+  // Vercel's serverless (Lambda) runtime needs — its build container's "native"
+  // detection doesn't match the actual runtime, so it must be listed explicitly.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

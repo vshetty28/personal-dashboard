@@ -22,10 +22,15 @@ import type {
 export const dynamic = "force-dynamic";
 
 async function getDigest<T>(type: "EMAIL" | "NEWS" | "PORTFOLIO", date: Date): Promise<T | null> {
-  const digest = await db.digest.findUnique({
-    where: { type_date: { type, date } },
-  });
-  return (digest?.payload as T) ?? null;
+  try {
+    const digest = await db.digest.findUnique({
+      where: { type_date: { type, date } },
+    });
+    return (digest?.payload as T) ?? null;
+  } catch (err) {
+    console.error(`Failed to load ${type} digest`, err);
+    return null;
+  }
 }
 
 export default async function DashboardPage(props: PageProps<"/">) {

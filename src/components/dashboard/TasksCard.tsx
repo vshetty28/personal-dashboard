@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { Card, EmptyState, ConnectLink } from "./Card";
+import { Card, EmptyState, ActionLink } from "./Card";
 import { Badge } from "@/components/ui/badge";
 
 type Task = { id: string; title: string; projectName: string; overdue: boolean; webLink: string };
@@ -8,9 +8,12 @@ export function TasksCard({ connected, tasks }: { connected: boolean; tasks: Tas
   return (
     <Card title="Tasks">
       {!connected ? (
-        <ConnectLink href="/api/integrations/ticktick/connect" label="Connect TickTick" />
+        <ActionLink href="/api/integrations/ticktick/connect" label="Connect TickTick" />
       ) : tasks.length === 0 ? (
-        <EmptyState>Nothing due today.</EmptyState>
+        <div className="space-y-2">
+          <EmptyState>Nothing due today.</EmptyState>
+          <ActionLink href="https://ticktick.com/webapp" label="Open TickTick" external />
+        </div>
       ) : (
         <ul className="space-y-2">
           {tasks.map((t) => (

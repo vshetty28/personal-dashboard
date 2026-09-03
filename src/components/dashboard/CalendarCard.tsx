@@ -1,5 +1,5 @@
 import { ExternalLink } from "lucide-react";
-import { Card, EmptyState, ConnectLink } from "./Card";
+import { Card, EmptyState, ActionLink } from "./Card";
 import type { CalendarEvent } from "@/lib/google";
 
 function formatTime(dt?: string | null) {
@@ -19,9 +19,12 @@ export function CalendarCard({
   return (
     <Card title="Today's Calendar">
       {!connected ? (
-        <ConnectLink href="/api/integrations/google/connect" label="Connect Google Calendar" />
+        <ActionLink href="/api/integrations/google/connect" label="Connect Google Calendar" />
       ) : events.length === 0 ? (
-        <EmptyState>Nothing on the calendar today.</EmptyState>
+        <div className="space-y-2">
+          <EmptyState>Nothing on the calendar today.</EmptyState>
+          <ActionLink href="https://calendar.google.com" label="Open Google Calendar" external />
+        </div>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (

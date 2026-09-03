@@ -29,6 +29,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
   const { date: dateParam } = await props.searchParams;
   const selectedDate = parseDateParam(Array.isArray(dateParam) ? dateParam[0] : dateParam);
   const isToday = selectedDate.getTime() === startOfTodayUTC().getTime();
+  const dateStr = formatDateParam(selectedDate);
 
   const [briefing, calendarEvents, tasks] = await Promise.all([
     getBriefing(selectedDate),
@@ -49,7 +50,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
             })}
           </h1>
           <div className="flex items-center gap-3">
-            <DateNav date={formatDateParam(selectedDate)} isToday={isToday} />
+            <DateNav date={dateStr} isToday={isToday} />
             <SignOutButton />
           </div>
         </header>
@@ -62,7 +63,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
         )}
 
         <div className="mb-10">
-          <EmailAttentionSection items={briefing?.emailAttention ?? []} />
+          <EmailAttentionSection date={dateStr} items={briefing?.emailAttention ?? []} />
         </div>
 
         {!briefing ? (

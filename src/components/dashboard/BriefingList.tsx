@@ -17,9 +17,6 @@ function ItemRow({ topic, item }: { topic: BriefingTopic; item: BriefingNewsItem
   return (
     <li className="border-b border-border pb-4 last:border-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className="text-xs text-muted-foreground">
-          {TOPIC_LABELS[topic]}
-        </Badge>
         {isMarketsItem(item) && (
           <Badge variant="secondary" className="font-mono text-xs">
             {item.ticker}
@@ -35,7 +32,12 @@ function ItemRow({ topic, item }: { topic: BriefingTopic; item: BriefingNewsItem
           <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
         </a>
       </div>
-      <p className="mt-0.5 text-xs text-muted-foreground">{item.source}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-xs text-primary">
+          {TOPIC_LABELS[topic]}
+        </Badge>
+        <span className="text-xs text-muted-foreground">{item.source}</span>
+      </div>
       <p className="mt-2 text-sm text-foreground/90">{item.whyItMatters}</p>
       <p className="mt-1 text-sm text-muted-foreground">{item.summary}</p>
     </li>

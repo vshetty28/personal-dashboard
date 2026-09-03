@@ -8,21 +8,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing code" }, { status: 400 });
   }
 
-  const tokens = await exchangeTickTickCode(code);
+  try {
+    const tokens = await exchangeTickTickCode(code);
 
-  await db.oAuthCredential.upsert({
-    where: { provider: "TICKTICK" },
-    create: {
-      provider: "TICKTICK",
-      accessToken: tokens.access_token,
-      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
-      scope: "tasks:read tasks:write",
-    },
-    update: {
-      accessToken: tokens.access_token,
-      expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
-    },
-  });
+    await db.oAuthCredential.upsert({
+      where: { provider: "TICKTICK" },
+      create: {
+        provider: "TICKTICK",
+        accessToken: tokens.access_token,
+        expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
+        scope: "tasks:read tasks:write",
+      },
+      update: {
+        accessToken: tokens.access_token,
+        expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
+      },
+    });
 
-  return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/", req.url));
+  } catch (err) {
+    console.error("TickTick OAuth callback failed", err);
+    return NextResponse.json(
+      { error: "TickTick OAuth callback failed", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
 }

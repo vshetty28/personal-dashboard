@@ -1,5 +1,6 @@
 import { google, calendar_v3 } from "googleapis";
 import { db } from "@/lib/db";
+import { localDateString, zonedDayBounds } from "@/lib/time";
 
 export function createOAuthClient() {
   return new google.auth.OAuth2(
@@ -62,10 +63,8 @@ export async function getTodaysCalendarEvents(): Promise<CalendarEvent[] | null>
   if (!client) return null;
 
   const calendar = google.calendar({ version: "v3", auth: client });
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
+  // The server runs in UTC; "today" means the calendar day in DASHBOARD_TIMEZONE.
+  const { start, end } = zonedDayBounds(localDateString());
 
   const results = await Promise.all(
     configuredCalendarIds().map(async (calendarId) => {

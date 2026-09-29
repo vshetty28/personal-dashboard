@@ -65,63 +65,107 @@ openssl rand -hex 32   # -> INGEST_API_KEY
 
 ### Ingest contract
 
-One consolidated post per day — the whole daily briefing in one payload, not split by
-topic:
+Two kinds of post, both to the same endpoint with the same bearer token. The zod
+schemas in [`src/lib/digest-types.ts`](src/lib/digest-types.ts) are the source of truth.
 
 ```
 POST /api/ingest
 Authorization: Bearer <INGEST_API_KEY>
 Content-Type: application/json
+```
 
+**Daily briefing** (`kind` may be omitted; it defaults to `"briefing"`):
+
+```jsonc
 {
-  "date": "2026-09-03",   // optional, defaults to today (UTC)
-  "payload": { ... }       // see shape below, and src/lib/digest-types.ts
+  "kind": "briefing",
+  "date": "2026-09-29",        // optional, defaults to today in DASHBOARD_TIMEZONE
+  "payload": {
+    "headline": [               // optional; the opening sentence, as colored segments
+      { "text": "Recruiter reply is due Thursday", "tone": "action" },
+      { "text": ". In the news, " },
+      { "text": "open-weight models closed in on agentic coding", "tone": "aiLlm" }
+    ],
+    "topics": {
+      "aiLlm": [NewsItem], "softwareEngineering": [NewsItem], "spaceDefense": [NewsItem],
+      "markets": [MarketsItem], "healthFitness": [NewsItem], "sports": [NewsItem]
+    },
+    "emailAttention": [EmailAttentionItem]   // [] when nothing needs you; don't omit
+  }
 }
 ```
 
-Re-posting the same `date` overwrites that day's briefing (upsert), so the agent can
-safely retry or re-run.
-
-> **"Today" is the UTC calendar date** (see [`src/lib/date.ts`](src/lib/date.ts)), not
-> your local date — the dashboard looks up the briefing for `date` omitted = today in
-> UTC. For a US-timezone agent run once each morning this is never actually ambiguous,
-> but if you ever schedule the agent close to UTC midnight, pass `date` explicitly
-> rather than relying on the default.
-
-Payload shape (validated server-side with zod, see
-[`src/app/api/ingest/route.ts`](src/app/api/ingest/route.ts)):
-
-```ts
-{
-  topics: {
-    aiLlm: NewsItem[],
-    softwareEngineering: NewsItem[],
-    spaceDefense: NewsItem[],
-    markets: MarketsItem[],       // NewsItem + a `ticker` field
-    healthFitness: NewsItem[],
-    sports: NewsItem[],
-  },
-  emailAttention: EmailAttentionItem[],  // [] if nothing needs attention — say so
-                                          // explicitly rather than omitting the field
-}
-
+```jsonc
 // NewsItem
-{ title, source, url, summary, whyItMatters }
-
-// MarketsItem
-{ title, source, url, summary, whyItMatters, ticker }   // ticker: "PLTR", or a short
-                                                          // label for a private company
-                                                          // like "SpaceX"
+{
+  "title": "...", "source": "...", "url": "...",
+  "summary": "1-2 sentences",           // shown as a one-liner, expanded on click
+  "whyItMatters": "...",
+  "tldr": "12 words max",               // optional; the line you scan. Falls back to title
+  "priority": 1                         // optional; 1 = must know, 2 = normal (default), 3 = low
+}
+// MarketsItem = NewsItem + { "ticker": "PLTR", "move": "+2.1%" }   // move optional; "+" up, "-" down
 
 // EmailAttentionItem
-{ sender, subject, whyItMatters, nextAction, deadline? }  // deadline is free text,
-                                                            // e.g. "Fri 9/5", "Today"
+{
+  "sender": "...", "subject": "...",
+  "whyItMatters": "what the email says / why it needs you",   // shown in full
+  "nextAction": "the call to action",
+  "dueAt": "2026-10-01",                // optional; drives the countdown (orange within 2 days)
+  "category": "Career",                 // optional
+  "summary": "...",                     // optional; replaces whyItMatters on the card
+  "deadline": "End of week"             // optional free text, only used without dueAt
+}
 ```
 
-Every topic array is expected on every post — send `[]` for a topic with nothing
-noteworthy that day rather than omitting the key. The dashboard renders all 6 topics
-every day (collapsed to just a heading when empty) so you can see at a glance which
-areas the agent covered.
+`headline` tones: `"action"` (orange), `"weekend"` (gold), or a topic key (that
+topic's color). If you leave `headline` out the page writes a plain one from the counts.
+
+Prompting notes for the agent, since the visual cues come from these fields:
+
+- At most **3** items across the whole day should be `priority: 1`. More than that
+  and "Must know" stops meaning anything.
+- `tldr` is a takeaway, not a shortened headline: "PLTR defense contracts extended into
+  next fiscal year", not "Palantir news".
+- Use `dueAt` whenever an email has a real deadline; the countdown only works with it.
+
+**Weekend briefing** (promotions + curated readings, once a week):
+
+```jsonc
+{
+  "kind": "weekend",
+  "date": "2026-10-02",                 // optional; any day of the weekend or the Friday
+                                        // before. Normalized to that Saturday.
+  "visibleUntil": "2026-10-04T23:59:59-04:00",  // optional; defaults to end of Sunday
+  "payload": {
+    "promotions": [
+      { "merchant": "Uniqlo", "offer": "20% off", "detail": "Outerwear",
+        "code": "FALL20", "url": "...", "expiresAt": "2026-10-03" }   // detail/code/url/expiresAt optional
+    ],
+    "readings": [
+      { "title": "...", "source": "...", "url": "...", "minutes": 12, "why": "why it was picked" }
+    ]
+  }
+}
+```
+
+The weekend briefing shows on the dashboard from Saturday until `visibleUntil`.
+Expired deals (past `expiresAt`) are hidden automatically.
+
+Re-posting the same day (briefing) or weekend (weekend) overwrites it, so the agent
+can safely retry.
+
+> **"Today" is the calendar date in `DASHBOARD_TIMEZONE`** (default
+> `America/Indiana/Indianapolis`, see [`src/lib/time.ts`](src/lib/time.ts)). Before
+> this it was the UTC date, which rolled over at 8pm Eastern.
+
+### Retention
+
+Nothing is kept longer than 30 days. A Vercel cron (`vercel.json`) calls
+`/api/cron/retention` nightly and deletes older briefings, weekend briefings and
+done/dismissed marks. Set `CRON_SECRET` in Vercel; the route rejects calls without
+it. The pages also refuse to show anything outside the window, so a missed cron run
+never surfaces old data.
 
 ## 4. Google Calendar
 
@@ -147,6 +191,11 @@ areas the agent covered.
 3. Set `TICKTICK_CLIENT_ID`, `TICKTICK_CLIENT_SECRET`, `TICKTICK_REDIRECT_URI`.
 4. Visit `/api/integrations/ticktick/connect` while logged in to authorize.
 
+The dashboard writes back to TickTick: checking a task calls
+`POST /open/v1/project/{projectId}/task/{taskId}/complete`, and the quick-add box calls
+`POST /open/v1/task` (no projectId, so it lands in the Inbox, due today). Both need the
+`tasks:write` scope, which the connect flow already requests.
+
 Note: the TickTick integration is written against their public Open API docs but hasn't
 been exercised against a live app registration yet — double check response shapes in
 [`src/lib/ticktick.ts`](src/lib/ticktick.ts) once you have real credentials, and adjust the
@@ -157,7 +206,7 @@ been exercised against a live app registration yet — double check response sha
 ```bash
 cp .env.example .env.local   # fill in the values from steps above
 npm install
-npx prisma migrate dev
+npx prisma migrate dev       # applies prisma/migrations, including WeekendBriefing + ItemMark
 npm run dev
 ```
 

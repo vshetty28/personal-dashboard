@@ -1,49 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { startOfTodayUTC } from "@/lib/date";
+import { briefingPayloadSchema, weekendIngestSchema, weekendPayloadSchema } from "@/lib/digest-types";
+import { addDays, keyFromString, keyToString, todayKey, weekendStart, zonedDayBounds } from "@/lib/time";
 import type { Prisma } from "@prisma/client";
 
-const newsItemSchema = z.object({
-  title: z.string(),
-  source: z.string(),
-  url: z.string(),
-  summary: z.string(),
-  whyItMatters: z.string(),
-});
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 
-const marketsItemSchema = newsItemSchema.extend({
-  ticker: z.string(),
-});
-
-const emailAttentionItemSchema = z.object({
-  sender: z.string(),
-  subject: z.string(),
-  whyItMatters: z.string(),
-  deadline: z.string().optional(),
-  nextAction: z.string(),
-});
-
-const ingestSchema = z.object({
-  date: z.string().date().optional(), // YYYY-MM-DD, defaults to today (UTC)
-  payload: z.object({
-    topics: z.object({
-      aiLlm: z.array(newsItemSchema),
-      softwareEngineering: z.array(newsItemSchema),
-      spaceDefense: z.array(newsItemSchema),
-      markets: z.array(marketsItemSchema),
-      healthFitness: z.array(newsItemSchema),
-      sports: z.array(newsItemSchema),
-    }),
-    emailAttention: z.array(emailAttentionItemSchema),
+// `kind` is optional so existing daily posts (no kind) keep working.
+const ingestSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("briefing"),
+    date: dateString.optional(), // defaults to today in DASHBOARD_TIMEZONE
+    payload: briefingPayloadSchema,
   }),
-});
+  z.object({
+    kind: z.literal("weekend"),
+    // Any day of (or the Friday before) the weekend; normalized to that Saturday.
+    date: dateString.optional(),
+    // ISO timestamp. Defaults to the end of Sunday in DASHBOARD_TIMEZONE.
+    visibleUntil: z.string().datetime({ offset: true }).optional(),
+    payload: weekendIngestSchema,
+  }),
+]);
 
 function isAuthorized(req: NextRequest) {
   const key = process.env.INGEST_API_KEY;
   if (!key) return false;
-  const header = req.headers.get("authorization");
-  return header === `Bearer ${key}`;
+  return req.headers.get("authorization") === `Bearer ${key}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,20 +36,48 @@ export async function POST(req: NextRequest) {
   }
 
   const json = await req.json().catch(() => null);
-  const parsed = ingestSchema.safeParse(json);
+  const withKind = json && typeof json === "object" && !("kind" in json) ? { ...json, kind: "briefing" } : json;
+  const parsed = ingestSchema.safeParse(withKind);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: z.treeifyError(parsed.error) }, { status: 400 });
   }
 
-  const { date, payload } = parsed.data;
-  const targetDate = date ? new Date(`${date}T00:00:00.000Z`) : startOfTodayUTC();
-  const jsonPayload = payload as Prisma.InputJsonObject;
+  const body = parsed.data;
 
-  const briefing = await db.briefing.upsert({
-    where: { date: targetDate },
-    create: { date: targetDate, payload: jsonPayload },
-    update: { payload: jsonPayload },
+  if (body.kind === "briefing") {
+    const date = body.date ? keyFromString(body.date) : todayKey();
+    const payload = body.payload as Prisma.InputJsonObject;
+    const row = await db.briefing.upsert({
+      where: { date },
+      create: { date, payload },
+      update: { payload },
+    });
+    return NextResponse.json({ ok: true, kind: "briefing", date: keyToString(row.date) });
+  }
+
+  const weekOf = weekendStart(body.date ? keyFromString(body.date) : todayKey());
+  const existing = await db.weekendBriefing.findUnique({ where: { weekOf } });
+  const previous = existing ? weekendPayloadSchema.safeParse(existing.payload) : null;
+  const base = previous?.success ? previous.data : { promotions: [], readings: [] };
+  // Merge by section so the deals and readings automations don't overwrite each other.
+  const merged = {
+    promotions: body.payload.promotions ?? base.promotions,
+    readings: body.payload.readings ?? base.readings,
+  };
+  const visibleUntil = body.visibleUntil
+    ? new Date(body.visibleUntil)
+    : (existing?.visibleUntil ?? zonedDayBounds(keyToString(addDays(weekOf, 1))).end);
+  const payload = merged as Prisma.InputJsonObject;
+  const row = await db.weekendBriefing.upsert({
+    where: { weekOf },
+    create: { weekOf, visibleUntil, payload },
+    update: { visibleUntil, payload },
   });
-
-  return NextResponse.json({ ok: true, date: briefing.date });
+  return NextResponse.json({
+    ok: true,
+    kind: "weekend",
+    weekOf: keyToString(row.weekOf),
+    visibleUntil: row.visibleUntil.toISOString(),
+    counts: { promotions: merged.promotions.length, readings: merged.readings.length },
+  });
 }

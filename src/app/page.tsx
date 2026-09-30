@@ -1,77 +1,52 @@
-import { db } from "@/lib/db";
-import { startOfTodayUTC, parseDateParam, formatDateParam } from "@/lib/date";
-import { getTodaysCalendarEvents } from "@/lib/google";
-import { getTodaysTickTickTasks } from "@/lib/ticktick";
-import { CalendarCard } from "@/components/dashboard/CalendarCard";
-import { TasksCard } from "@/components/dashboard/TasksCard";
-import { SignOutButton } from "@/components/dashboard/SignOutButton";
-import { DateNav } from "@/components/dashboard/DateNav";
-import { BriefingList } from "@/components/dashboard/BriefingList";
-import { EmailAttentionSection } from "@/components/dashboard/EmailAttentionSection";
-import type { BriefingPayload } from "@/lib/digest-types";
+import { loadDay } from "@/lib/load-day";
+import { TopBar } from "@/components/dashboard/TopBar";
+import { Headline } from "@/components/dashboard/Headline";
+import { GlanceTiles } from "@/components/dashboard/GlanceTiles";
+import { ScheduleTimeline } from "@/components/dashboard/ScheduleTimeline";
+import { WeekendBriefing } from "@/components/dashboard/WeekendBriefing";
+import { NeedsYou } from "@/components/dashboard/NeedsYou";
+import { TasksPanel } from "@/components/dashboard/TasksPanel";
+import { ByTopic, MustKnow } from "@/components/dashboard/Stories";
+import { MobileNav } from "@/components/dashboard/MobileNav";
 
-// This page has no dynamic API calls of its own (cookies/headers), so without
-// this Next.js would statically render it once and cache the result — stale
-// forever, since the whole point is to reflect data pushed after that render.
+// Reads the DB and live APIs on every request; never statically cached.
 export const dynamic = "force-dynamic";
 
-async function getBriefing(date: Date): Promise<BriefingPayload | null> {
-  try {
-    const briefing = await db.briefing.findUnique({ where: { date } });
-    return (briefing?.payload as BriefingPayload) ?? null;
-  } catch (err) {
-    console.error("Failed to load briefing", err);
-    return null;
-  }
-}
-
-export default async function DashboardPage(props: PageProps<"/">) {
-  const { date: dateParam } = await props.searchParams;
-  const selectedDate = parseDateParam(Array.isArray(dateParam) ? dateParam[0] : dateParam);
-  const isToday = selectedDate.getTime() === startOfTodayUTC().getTime();
-  const dateStr = formatDateParam(selectedDate);
-
-  const [briefing, calendarEvents, tasks] = await Promise.all([
-    getBriefing(selectedDate),
-    isToday ? getTodaysCalendarEvents().catch(() => null) : Promise.resolve(null),
-    isToday ? getTodaysTickTickTasks().catch(() => null) : Promise.resolve(null),
-  ]);
+export default async function TodayPage(props: PageProps<"/">) {
+  const { date } = await props.searchParams;
+  const d = await loadDay(date, { live: true });
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10 sm:px-8">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <h1 className="font-heading text-2xl font-medium text-foreground">
-            {selectedDate.toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              timeZone: "UTC",
-            })}
-          </h1>
-          <div className="flex items-center gap-3">
-            <DateNav date={dateStr} isToday={isToday} />
-            <SignOutButton />
-          </div>
-        </header>
+    <div className="min-h-screen pb-28 md:pb-14">
+      <TopBar days={d.stripDays} syncedAt={d.syncedAt} />
+      <main className="mx-auto max-w-[1440px] px-5 md:px-12">
+        <Headline eyebrow={d.eyebrow} segments={d.headline} />
+        <GlanceTiles tiles={d.tiles} />
 
-        {isToday && (
-          <div className="mb-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <CalendarCard connected={calendarEvents !== null} events={calendarEvents ?? []} />
-            <TasksCard connected={tasks !== null} tasks={tasks ?? []} />
-          </div>
-        )}
-
-        <div className="mb-10">
-          <EmailAttentionSection date={dateStr} items={briefing?.emailAttention ?? []} />
-        </div>
-
-        {!briefing ? (
-          <p className="text-sm text-muted-foreground">No briefing for this day.</p>
+        {d.isToday ? (
+          <ScheduleTimeline tz={d.tz} events={d.events} nowIso={d.nowIso} connected={d.calendarConnected} />
         ) : (
-          <BriefingList topics={briefing.topics} />
+          <p className="mt-4 rounded-[14px] border border-line bg-surface px-5 py-3.5 text-[13px] text-dim">
+            Schedule and tasks are live, so they only show for today.
+          </p>
         )}
-      </div>
-    </main>
+
+        {d.weekend && <WeekendBriefing weekend={d.weekend} rangeLabel={d.weekendRange} />}
+
+        {/* Phone order follows the DOM: Needs you, Tasks, Must know, By topic. */}
+        <div className="mt-7 grid items-start gap-7 lg:mt-8 lg:grid-cols-[440px_minmax(0,1fr)] lg:gap-8">
+          <div className="flex min-w-0 flex-col gap-7">
+            <NeedsYou emails={d.emails} hasBriefing={d.hasBriefing} />
+            {d.isToday && <TasksPanel tasks={d.tasks} />}
+          </div>
+          <div className="flex min-w-0 flex-col gap-7">
+            <MustKnow stories={d.mustKnow} />
+            <ByTopic groups={d.groups} />
+            {!d.hasBriefing && <p className="text-sm text-dim">No briefing for this day.</p>}
+          </div>
+        </div>
+      </main>
+      <MobileNav date={d.isToday ? undefined : d.dateStr} />
+    </div>
   );
 }

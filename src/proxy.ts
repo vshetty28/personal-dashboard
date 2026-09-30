@@ -3,9 +3,11 @@ import { jwtVerify } from "jose";
 import { SESSION_COOKIE } from "@/lib/auth";
 
 // Routes reachable without a dashboard session.
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
-// The ingest endpoint authenticates itself via bearer API key, not the session cookie.
-const API_KEY_PATHS = ["/api/ingest"];
+// The manifest and icon are fetched by the browser without cookies, so they must be public.
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/manifest.webmanifest", "/icon.svg"];
+// These authenticate themselves via bearer token (INGEST_API_KEY / CRON_SECRET),
+// not the session cookie.
+const API_KEY_PATHS = ["/api/ingest", "/api/cron/"];
 
 async function hasValidSession(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;

@@ -46,3 +46,26 @@ model Briefing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Posted once a week by the promotions/readings automations (POST /api/ingest with
+// kind "weekend"). Keyed by the Saturday that starts the weekend; shown on the
+// dashboard from Saturday through `visibleUntil` (Sunday night by default).
+model WeekendBriefing {
+  weekOf       DateTime @id @db.Date
+  visibleUntil DateTime
+  payload      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Per-item state set from the dashboard (email handled, deal dismissed, reading
+// read). Stored server-side so it's the same on phone and laptop. `date` is the
+// day the item belongs to, used by the 30-day retention sweep.
+model ItemMark {
+  key       String   @id
+  kind      String
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}

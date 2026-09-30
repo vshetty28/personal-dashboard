@@ -95,6 +95,8 @@ export const promotionSchema = z.object({
   expiresAt: dateString.optional(),
 });
 
+export const READING_TYPES = ["paper", "preprint", "report", "analysis", "industry"] as const;
+
 export const readingSchema = z.object({
   title: z.string(),
   source: z.string(),
@@ -102,12 +104,29 @@ export const readingSchema = z.object({
   minutes: z.number().int().positive().optional(),
   /** Why it was picked for you. */
   why: z.string(),
+  /** paper = peer-reviewed, preprint, report = industry/technical report, analysis, industry = industry development. */
+  type: z.enum(READING_TYPES).optional(),
 });
 
+/** Stored weekend briefing (both sections always present once read). */
 export const weekendPayloadSchema = z.object({
   promotions: z.array(promotionSchema).default([]),
   readings: z.array(readingSchema).default([]),
 });
+
+/**
+ * What a weekend post may contain. Deals and readings come from separate
+ * automations, so each post carries only its own section; a section left out
+ * is kept as it was, a section sent (even []) replaces what was there.
+ */
+export const weekendIngestSchema = z
+  .object({
+    promotions: z.array(promotionSchema).optional(),
+    readings: z.array(readingSchema).optional(),
+  })
+  .refine((p) => p.promotions !== undefined || p.readings !== undefined, {
+    message: "send promotions, readings, or both",
+  });
 
 export type BriefingNewsItem = z.infer<typeof newsItemSchema>;
 export type MarketsItem = z.infer<typeof marketsItemSchema>;

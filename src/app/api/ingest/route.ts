@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { briefingPayloadSchema, weekendPayloadSchema } from "@/lib/digest-types";
+import { briefingPayloadSchema, weekendIngestSchema, weekendPayloadSchema } from "@/lib/digest-types";
 import { addDays, keyFromString, keyToString, todayKey, weekendStart, zonedDayBounds } from "@/lib/time";
 import type { Prisma } from "@prisma/client";
 
@@ -20,7 +20,7 @@ const ingestSchema = z.discriminatedUnion("kind", [
     date: dateString.optional(),
     // ISO timestamp. Defaults to the end of Sunday in DASHBOARD_TIMEZONE.
     visibleUntil: z.string().datetime({ offset: true }).optional(),
-    payload: weekendPayloadSchema,
+    payload: weekendIngestSchema,
   }),
 ]);
 
@@ -56,10 +56,18 @@ export async function POST(req: NextRequest) {
   }
 
   const weekOf = weekendStart(body.date ? keyFromString(body.date) : todayKey());
+  const existing = await db.weekendBriefing.findUnique({ where: { weekOf } });
+  const previous = existing ? weekendPayloadSchema.safeParse(existing.payload) : null;
+  const base = previous?.success ? previous.data : { promotions: [], readings: [] };
+  // Merge by section so the deals and readings automations don't overwrite each other.
+  const merged = {
+    promotions: body.payload.promotions ?? base.promotions,
+    readings: body.payload.readings ?? base.readings,
+  };
   const visibleUntil = body.visibleUntil
     ? new Date(body.visibleUntil)
-    : zonedDayBounds(keyToString(addDays(weekOf, 1))).end;
-  const payload = body.payload as Prisma.InputJsonObject;
+    : (existing?.visibleUntil ?? zonedDayBounds(keyToString(addDays(weekOf, 1))).end);
+  const payload = merged as Prisma.InputJsonObject;
   const row = await db.weekendBriefing.upsert({
     where: { weekOf },
     create: { weekOf, visibleUntil, payload },
@@ -70,5 +78,6 @@ export async function POST(req: NextRequest) {
     kind: "weekend",
     weekOf: keyToString(row.weekOf),
     visibleUntil: row.visibleUntil.toISOString(),
+    counts: { promotions: merged.promotions.length, readings: merged.readings.length },
   });
 }

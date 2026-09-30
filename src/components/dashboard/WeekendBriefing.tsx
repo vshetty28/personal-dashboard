@@ -4,6 +4,14 @@ import { useState, useTransition } from "react";
 import { setMark } from "@/app/actions";
 import type { WeekendView } from "@/lib/view";
 
+const TYPE_LABELS: Record<string, string> = {
+  paper: "Paper",
+  preprint: "Preprint",
+  report: "Report",
+  analysis: "Analysis",
+  industry: "Industry",
+};
+
 /**
  * Only rendered while a weekend briefing is live (Saturday through Sunday
  * night). Gold = deals, cream "paper" cards = reading, used nowhere else.
@@ -153,7 +161,10 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
                           {r.minutes}m
                         </span>
                       ) : null}
-                      <span className="truncate text-paper-dim">{r.source}</span>
+                      <span className="truncate text-paper-dim">
+                        {r.type ? `${TYPE_LABELS[r.type] ?? r.type} · ` : ""}
+                        {r.source}
+                      </span>
                     </div>
                     <h3 className={"font-serif text-[15.5px] leading-[1.3] font-semibold md:text-[17px] " + (done ? "line-through" : "")}>
                       <a href={r.url} target="_blank" rel="noreferrer">

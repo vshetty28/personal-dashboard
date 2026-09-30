@@ -131,7 +131,7 @@ export type DealView = {
   endsToday: boolean;
 };
 
-export type ReadView = { key: string; title: string; source: string; url: string; minutes?: number; why: string; done: boolean };
+export type ReadView = { key: string; title: string; source: string; url: string; minutes?: number; why: string; type?: string; done: boolean };
 
 export type WeekendView = {
   weekOf: string;
@@ -163,7 +163,7 @@ export function buildWeekend(weekend: LoadedWeekend, today: Date, marks: Set<str
   deals.sort((a, b) => Number(b.endsToday) - Number(a.endsToday));
   const reads = weekend.payload.readings.map((r) => {
     const key = readKey(weekend.weekOf, r);
-    return { key, title: r.title, source: r.source, url: r.url, minutes: r.minutes, why: r.why, done: marks.has(key) };
+    return { key, title: r.title, source: r.source, url: r.url, minutes: r.minutes, why: r.why, type: r.type, done: marks.has(key) };
   });
   return { weekOf: keyToString(weekend.weekOf), deals, reads, dismissedDeals };
 }

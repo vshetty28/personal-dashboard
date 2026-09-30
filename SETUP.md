@@ -129,31 +129,37 @@ Prompting notes for the agent, since the visual cues come from these fields:
   next fiscal year", not "Palantir news".
 - Use `dueAt` whenever an email has a real deadline; the countdown only works with it.
 
-**Weekend briefing** (promotions + curated readings, once a week):
+**Weekend briefing** (promotions + curated readings). These come from two separate
+automations, so each post sends only its own section:
 
 ```jsonc
 {
   "kind": "weekend",
-  "date": "2026-10-02",                 // optional; any day of the weekend or the Friday
+  "date": "2026-10-03",                 // optional; any day of the weekend or the Friday
                                         // before. Normalized to that Saturday.
   "visibleUntil": "2026-10-04T23:59:59-04:00",  // optional; defaults to end of Sunday
   "payload": {
+    // Deal scout sends only this:
     "promotions": [
-      { "merchant": "Uniqlo", "offer": "20% off", "detail": "Outerwear",
-        "code": "FALL20", "url": "...", "expiresAt": "2026-10-03" }   // detail/code/url/expiresAt optional
+      { "merchant": "On", "offer": "45% off", "detail": "Roger Advantage · $150 → $82",
+        "code": "…", "url": "…", "expiresAt": "2026-10-05" }   // detail/code/url/expiresAt optional
     ],
+    // Reading brief sends only this:
     "readings": [
-      { "title": "...", "source": "...", "url": "...", "minutes": 12, "why": "why it was picked" }
+      { "title": "…", "source": "arXiv", "url": "…", "minutes": 25, "type": "preprint",
+        "why": "why it was picked" }     // type: paper | preprint | report | analysis | industry
     ]
   }
 }
 ```
 
-The weekend briefing shows on the dashboard from Saturday until `visibleUntil`.
-Expired deals (past `expiresAt`) are hidden automatically.
+A section that's left out is kept as it was; a section that's sent (even `[]`)
+replaces that section for the weekend. At least one of the two must be present.
+The weekend briefing shows on the dashboard from Saturday until `visibleUntil`, and
+expired deals (past `expiresAt`) are hidden automatically.
 
-Re-posting the same day (briefing) or weekend (weekend) overwrites it, so the agent
-can safely retry.
+Re-posting the same day (briefing) or the same weekend section overwrites it, so the
+automations can safely retry.
 
 > **"Today" is the calendar date in `DASHBOARD_TIMEZONE`** (default
 > `America/Indiana/Indianapolis`, see [`src/lib/time.ts`](src/lib/time.ts)). Before

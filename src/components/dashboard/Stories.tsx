@@ -103,8 +103,63 @@ export function StoryRow({ story, open, onToggle }: { story: StoryView; open: bo
               Read source
             </a>
           </div>
+          <ContinueIn story={story} />
         </div>
       )}
+    </div>
+  );
+}
+
+// Apps a story can be handed off to, each opened with the prompt prefilled.
+// ChatGPT and Google (AI Mode, udm=50) submit it right away; Claude prefills the composer.
+const CONTINUE_TARGETS = [
+  { name: "ChatGPT", domain: "chatgpt.com", href: (q: string) => `https://chatgpt.com/?q=${q}` },
+  { name: "Claude", domain: "claude.ai", href: (q: string) => `https://claude.ai/new?q=${q}` },
+  { name: "Google", domain: "google.com", href: (q: string) => `https://www.google.com/search?udm=50&q=${q}` },
+] as const;
+
+function continuePrompt(story: StoryView): string {
+  const market = story.ticker ? [`Ticker: ${story.ticker}${story.move ? ` (${story.move} today)` : ""}`] : [];
+  return [
+    "I just read this story in my daily news briefing and want to go deeper.",
+    "",
+    `Headline: ${story.title}`,
+    `Source: ${story.source} (${story.url})`,
+    ...market,
+    `Summary: ${story.summary}`,
+    `Why it matters to me: ${story.why}`,
+    "",
+    "Give me the background I need, what is actually new here, and what to watch next. Use the source link and recent coverage.",
+  ].join("\n");
+}
+
+/** Icon-only row at the bottom of an expanded story: continue the story in ChatGPT, Claude, or Google. */
+function ContinueIn({ story }: { story: StoryView }) {
+  const q = encodeURIComponent(continuePrompt(story));
+  return (
+    <div className="mt-0.5 flex items-center gap-1">
+      {CONTINUE_TARGETS.map((t) => (
+        <a
+          key={t.name}
+          href={t.href(q)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Continue in ${t.name}`}
+          title={`Continue in ${t.name}`}
+          className="flex size-7 items-center justify-center rounded-md opacity-70 transition hover:bg-raised hover:opacity-100 focus-visible:bg-raised focus-visible:opacity-100"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- remote favicon, no optimization needed */}
+          <img
+            src={`https://www.google.com/s2/favicons?domain=${t.domain}&sz=64`}
+            alt=""
+            width={16}
+            height={16}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="size-4 rounded-[3px]"
+          />
+        </a>
+      ))}
     </div>
   );
 }

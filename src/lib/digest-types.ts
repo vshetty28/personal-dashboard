@@ -1,6 +1,6 @@
 // Contract for what the automations POST to /api/ingest.
 //
-// Two kinds of post:
+// Legacy kinds of post (independent daily kinds are defined below):
 //   kind "briefing" (default): one per day, the daily briefing + email attention.
 //   kind "weekend": one per weekend, promotions + curated readings.
 //
@@ -69,7 +69,7 @@ export const headlineSegmentSchema = z.object({
   tone: z.enum(HEADLINE_TONES).optional(),
 });
 
-export const briefingPayloadSchema = z.object({
+const dailyCoreSchema = z.object({
   /** The opening sentence, as colored segments. Optional; the page writes a plain fallback. */
   headline: z.array(headlineSegmentSchema).optional(),
   topics: z.object({
@@ -127,6 +127,20 @@ export const weekendIngestSchema = z
   .refine((p) => p.promotions !== undefined || p.readings !== undefined, {
     message: "send promotions, readings, or both",
   });
+
+/** Daily source snapshots; omitted sources retain their last value for this date. */
+export const briefingPayloadSchema = dailyCoreSchema.extend({
+  promotions: z.array(promotionSchema).optional(),
+  readings: z.array(readingSchema).optional(),
+  sourceUpdatedAt: z.record(z.string(), z.string().datetime()).optional(),
+});
+
+export const sourceIngestSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("email"), payload: z.object({ emailAttention: z.array(emailAttentionItemSchema) }).strict() }),
+  z.object({ kind: z.literal("news"), payload: z.object({ topics: dailyCoreSchema.shape.topics, headline: dailyCoreSchema.shape.headline }).strict() }),
+  z.object({ kind: z.literal("research"), payload: z.object({ readings: z.array(readingSchema) }).strict() }),
+  z.object({ kind: z.literal("deals"), payload: z.object({ promotions: z.array(promotionSchema) }).strict() }),
+]);
 
 export type BriefingNewsItem = z.infer<typeof newsItemSchema>;
 export type MarketsItem = z.infer<typeof marketsItemSchema>;

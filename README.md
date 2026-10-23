@@ -71,3 +71,8 @@ src/
 prisma/schema.prisma             OAuthCredential, Briefing, WeekendBriefing, ItemMark
 vercel.json                      cron schedule
 ```
+
+Independent scheduled uploads are supported for `email`, `news`, `research`, and
+`deals`, each with its own frequency and daily snapshot. See
+[Independent scheduled tasks](SETUP.md#independent-scheduled-tasks) for payloads
+and how to split an existing combined briefing task.

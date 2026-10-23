@@ -193,7 +193,7 @@ export function fallbackHeadline(opts: {
   if (segs.length) segs.push({ text: ". " });
   else if (opts.hasBriefing) segs.push({ text: "Nothing needs you right now. " });
   if (opts.weekend && (opts.weekend.deals.length || opts.weekend.reads.length)) {
-    segs.push({ text: "Your weekend briefing is in", tone: "weekend" });
+    segs.push({ text: "Your deals and reading are in", tone: "weekend" });
     segs.push({ text: ". " });
   }
   if (opts.mustKnow.length) {

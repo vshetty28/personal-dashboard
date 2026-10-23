@@ -13,8 +13,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 /**
- * Only rendered while a weekend briefing is live (Saturday through Sunday
- * night). Gold = deals, cream "paper" cards = reading, used nowhere else.
+ * Daily source snapshots or a legacy weekend briefing.
  */
 export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView; rangeLabel: string }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -28,7 +27,7 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
   function save(key: string, kind: "deal" | "read", on: boolean, undo: () => void) {
     startTransition(async () => {
       try {
-        await setMark({ key, kind, date: weekend.weekOf, on });
+        await setMark({ key, kind, date: key.split(":")[1], on });
       } catch {
         undo();
       }
@@ -68,15 +67,15 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
   return (
     <section
       id="weekend"
-      aria-label="Weekend briefing"
+      aria-label="Deals & reading"
       className="-mx-1 mt-4 scroll-mt-6 rounded-2xl border border-gold-line bg-gold-bg py-4 pl-4 md:mx-0 md:px-[22px] md:pt-[18px]"
     >
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pr-4 md:pr-0">
         <span className="flex h-[21px] items-center rounded-[5px] bg-gold px-2 text-[10.5px] font-bold tracking-[0.08em] text-canvas">
-          WEEKEND
+          FOR YOU
         </span>
-        <h2 className="text-base font-semibold md:text-[17px]">Weekend briefing</h2>
-        <span className="text-[12.5px] text-dim md:text-[13px]">{rangeLabel} · stays up all weekend</span>
+        <h2 className="text-base font-semibold md:text-[17px]">Deals & reading</h2>
+        <span className="text-[12.5px] text-dim md:text-[13px]">{rangeLabel}</span>
         <span className="text-[12.5px] text-dim md:ml-auto md:text-[13px]">
           {deals.length} {deals.length === 1 ? "deal" : "deals"} · {unread} unread
         </span>

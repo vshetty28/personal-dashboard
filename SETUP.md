@@ -165,6 +165,58 @@ automations can safely retry.
 > `America/Indiana/Indianapolis`, see [`src/lib/time.ts`](src/lib/time.ts)). Before
 > this it was the UTC date, which rolled over at 8pm Eastern.
 
+### Independent scheduled tasks
+
+All tasks POST to `/api/ingest` with `Authorization: Bearer <INGEST_API_KEY>`.
+They can run at any frequency. Set `kind` to the section the task owns:
+
+| Task | `kind` | `payload` |
+| --- | --- | --- |
+| Email attention | `email` | `{ "emailAttention": [EmailAttentionItem] }` |
+| News | `news` | `{ "topics": { ... }, "headline": [...] }` (`headline` optional) |
+| Research | `research` | `{ "readings": [Reading] }` |
+| Deal hunter | `deals` | `{ "promotions": [Promotion] }` |
+
+Example email upload (an empty list clears today's email attention):
+
+```json
+{
+  "kind": "email",
+  "date": "2026-10-22",
+  "payload": { "emailAttention": [] }
+}
+```
+
+`date` is optional and defaults to today in `DASHBOARD_TIMEZONE`. Each upload
+replaces its section's complete snapshot for that date; other sections remain
+unchanged. News owns all topic arrays, so missing topic keys become empty arrays.
+A news upload without a headline clears the previous custom headline, allowing
+the dashboard to generate one from current counts. Only one task should own each
+section. Updates to the same section use the order writes acquire the database
+lock; there is no client timestamp ordering or item-by-item append.
+
+Research and deals display every day in **Deals & reading**. Explicitly empty
+daily sections override the corresponding legacy weekend sections. Daily data
+does not carry into tomorrow: each task should upload on every day it should appear.
+Per-source server timestamps are stored in `payload.sourceUpdatedAt`; the existing
+header still shows the most recent overall daily upload time.
+
+Existing `kind: "briefing"` (or omitted kind) uploads continue to update news,
+email, and headline together, preserving daily research/deals. **When splitting
+your current task, change it to `kind: "news"` and remove `emailAttention` from its
+payload**, then have the dedicated email task use `kind: "email"`. Otherwise the
+old combined task can still replace a newer email snapshot.
+
+Legacy `kind: "weekend"` remains supported with its existing visibility rules.
+Daily and weekend writes use transaction-scoped database locks to prevent lost
+updates between concurrent tasks, including the first upload for a date. No
+schema migration or new environment variables are required. Deploy the updated
+app before changing scheduled task payloads.
+
+Run ingest regression checks with `node --test tests/ingest.test.cjs`. These run
+the actual handler and schemas against an isolated database adapter; they do not
+connect to production Postgres.
+
 ### Retention
 
 Nothing is kept longer than 30 days. A Vercel cron (`vercel.json`) calls

@@ -13,6 +13,7 @@ import {
   shortDate,
   todayKey,
   weekdayShort,
+  zonedDayBounds,
 } from "@/lib/time";
 import {
   buildEmails,
@@ -59,8 +60,13 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
     getStripInfo(stripStart, stripEnd),
   ]);
 
+  const dailyExtras = briefing && (briefing.payload.promotions !== undefined || briefing.payload.readings !== undefined)
+    ? { weekOf: day, visibleUntil: zonedDayBounds(dateStr).end, payload: { promotions: briefing.payload.promotions ?? [], readings: briefing.payload.readings ?? [] } }
+    : null;
   const emailsRaw = briefing?.payload.emailAttention ?? [];
   const markKeys = [
+    ...(dailyExtras ? dailyExtras.payload.promotions.map((p) => dealKey(day, p)) : []),
+    ...(dailyExtras ? dailyExtras.payload.readings.map((r) => readKey(day, r)) : []),
     ...emailsRaw.map((e) => emailKey(day, e)),
     ...(weekendRow ? weekendRow.payload.promotions.map((p) => dealKey(weekendRow.weekOf, p)) : []),
     ...(weekendRow ? weekendRow.payload.readings.map((r) => readKey(weekendRow.weekOf, r)) : []),
@@ -72,7 +78,16 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
   const stories = briefing ? buildStories(briefing.payload) : [];
   const groups = groupStories(stories);
   const mustKnow = stories.filter((s) => s.priority === 1);
-  const weekend = weekendRow ? buildWeekend(weekendRow, today, marks) : null;
+  const legacyWeekend = weekendRow ? buildWeekend(weekendRow, today, marks) : null;
+  const dailyWeekend = dailyExtras ? buildWeekend(dailyExtras, today, marks) : null;
+  // Use daily snapshots when present, including explicitly empty snapshots.
+  // Preserve each section's original mark keys and retention date.
+  const weekend = dailyWeekend ? {
+    ...dailyWeekend,
+    deals: briefing?.payload.promotions !== undefined ? dailyWeekend.deals : legacyWeekend?.deals ?? [],
+    reads: briefing?.payload.readings !== undefined ? dailyWeekend.reads : legacyWeekend?.reads ?? [],
+    dismissedDeals: briefing?.payload.promotions !== undefined ? dailyWeekend.dismissedDeals : legacyWeekend?.dismissedDeals ?? 0,
+  } : legacyWeekend;
   const weekendLive = weekend && (weekend.deals.length > 0 || weekend.reads.length > 0) ? weekend : null;
   const overdue = (tasks ?? []).filter((t: DashboardTask) => t.overdue);
 
@@ -142,7 +157,7 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
   );
   if (weekendLive) {
     tiles.push({
-      label: "Weekend briefing",
+      label: "Deals & reading",
       value: `${weekendLive.deals.length}+${weekendLive.reads.filter((r) => !r.done).length}`,
       sub: "deals · unread reads",
       href: "#weekend",
@@ -165,7 +180,7 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
     });
   }
 
-  const weekendRange = weekendRow ? `${weekdayShort(weekendRow.weekOf)} ${shortDate(weekendRow.weekOf)} to Sun ${shortDate(addDays(weekendRow.weekOf, 1))}` : "";
+  const weekendRange = dailyExtras ? shortDate(day) : weekendRow ? `${weekdayShort(weekendRow.weekOf)} ${shortDate(weekendRow.weekOf)} to Sun ${shortDate(addDays(weekendRow.weekOf, 1))}` : "";
 
   return {
     tz: TIMEZONE,
@@ -185,6 +200,7 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
     weekend: weekendLive,
     weekendRange,
     stripDays,
+    sourceUpdatedAt: briefing?.payload.sourceUpdatedAt ?? {},
     syncedAt: briefing ? formatClockMeridiem(briefing.updatedAt) : null,
     nowIso: now.toISOString(),
   };

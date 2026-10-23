@@ -133,7 +133,9 @@ export async function getHistory(): Promise<HistoryDay[]> {
       stories,
       mustKnow,
       emails: p ? p.emailAttention.length : 0,
-      weekend: weekendByDay.get(key) ?? null,
+      weekend: p?.promotions !== undefined || p?.readings !== undefined
+        ? { deals: p.promotions?.length ?? weekendByDay.get(key)?.deals ?? 0, reads: p.readings?.length ?? weekendByDay.get(key)?.reads ?? 0 }
+        : weekendByDay.get(key) ?? null,
     });
   }
   return days;

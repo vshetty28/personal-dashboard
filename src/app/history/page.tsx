@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { DashboardLink as Link } from "@/components/dashboard/DashboardActivity";
 import { getHistory } from "@/lib/data";
 import { RETENTION_DAYS, isDateString, keyFromString, keyToString, shortDate, todayKey, weekday, weekdayShort } from "@/lib/time";
 import { TopBar } from "@/components/dashboard/TopBar";

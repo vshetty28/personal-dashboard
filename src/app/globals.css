@@ -139,3 +139,9 @@
     @apply font-sans;
   }
 }
+@utility date-strip {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

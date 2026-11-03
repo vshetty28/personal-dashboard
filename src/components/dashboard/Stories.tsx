@@ -45,7 +45,10 @@ export function MustKnowCard({ story, compact = false }: { story: StoryView; com
         </span>
         {story.why}
       </p>
-      <span className="text-xs text-dim">{story.source}</span>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <span className="text-xs text-dim">{story.source}</span>
+        <ContinueIn story={story} />
+      </div>
     </article>
   );
 }

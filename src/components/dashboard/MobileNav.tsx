@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { DashboardLink as Link } from "@/components/dashboard/DashboardActivity";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Newspaper, Sunrise } from "lucide-react";
 

@@ -276,3 +276,48 @@ npm run dev
    registered with Google/TickTick) to point at your production domain.
 4. Deploy. Run `npx prisma migrate deploy` against the production `DATABASE_URL` (or wire
    it into the build command) to apply the schema.
+
+### Linked email obligations
+
+Email items may include `obligationId`, `ticktickProjectId`, and `ticktickTaskId`.
+Supply all three nonempty fields together, or omit all three for legacy items.
+An email snapshot rejects duplicate obligation IDs and duplicate project/task
+pairs. The automation must send these fields for every new item, using PixelOS
+project `6ae973ab8f08b5e69137a517`. No database migration is needed.
+
+Linked cards replace Done with Open in TickTick. Their identity persists across
+days, and old dashboard marks cannot hide them. Completion happens in TickTick
+and is reflected after the next successful scheduled upload and dashboard reload;
+there is no live status lookup on email cards. Undated and future-due obligations
+remain in email attention even when excluded from the separate Today task panel.
+Historical unlinked cards retain their existing marking controls.
+
+Reconcile existing obligations offline before switching the scheduler prompt,
+encoding identity and source context in each PixelOS task description. Preserve
+verified handled obligations as completed managed tasks with recovery metadata.
+The automation reconstructs state using the TickTick integration’s open-task read
+and separate completed-history read. No local state file, checkpoint, or lock is
+required. Keep managed tasks and their metadata, including completed history;
+deleting these records removes the ability to recover their identities.
+
+The standalone prompt is in
+`scheduled-tasks/email-monitoring-automation-content.md`; restore the existing ingest
+credential privately before use. Deploy this compatible dashboard before activating
+the replacement prompt. See `email-monitoring-task.md` for rollout and rollback.
+
+### Scheduled-task content tracking
+
+Maintain the actual content of scheduled tasks in local Markdown files under
+`scheduled-tasks/` (for example,
+`scheduled-tasks/email-monitoring-automation-content.md`). This entire folder is
+gitignored: it provides local tracking and easy review, not Git version history
+or automatic scheduler synchronization. Keep each file aligned with its live
+scheduled task whenever instructions change. Create the directory locally on a
+fresh clone; these files do not ship with the repository. Keep credentials out
+of tracked documentation and use the scheduler’s existing private authentication
+configuration when installing a prompt.
+
+The email prompt needs the existing ingest credential and access to both Gmail
+accounts plus PixelOS open and completed tasks. Complete offline reconciliation
+before replacing the running task; the scheduled prompt contains no migration
+instructions. There is no local state-storage or concurrency setup step.

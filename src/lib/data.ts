@@ -62,7 +62,8 @@ export async function getWeekendFor(day: Date): Promise<LoadedWeekend | null> {
 
 export type MarkKind = "email" | "deal" | "read";
 
-export function emailKey(day: Date, item: Pick<EmailAttentionItem, "sender" | "subject">) {
+export function emailKey(day: Date, item: Pick<EmailAttentionItem, "sender" | "subject" | "obligationId">) {
+  if (item.obligationId) return `email:obligation:${item.obligationId}`;
   return `email:${keyToString(day)}:${item.sender}|${item.subject}`;
 }
 

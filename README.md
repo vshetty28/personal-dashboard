@@ -76,3 +76,17 @@ Independent scheduled uploads are supported for `email`, `news`, `research`, and
 `deals`, each with its own frequency and daily snapshot. See
 [Independent scheduled tasks](SETUP.md#independent-scheduled-tasks) for payloads
 and how to split an existing combined briefing task.
+
+Linked email attention cards open their corresponding PixelOS task in TickTick.
+Complete or reopen these obligations in TickTick; the email snapshot updates on
+the next successful automation run and dashboard reload. Legacy unlinked cards
+retain their existing local completion behavior. See
+[scheduled-tasks/email-monitoring-automation-content.md](scheduled-tasks/email-monitoring-automation-content.md)
+for the replacement automation prompt.
+
+Scheduled-task prompt content is maintained locally in `scheduled-tasks/`, which
+is gitignored. Write the actual content used by each scheduled task to a named
+Markdown file in that folder and update it whenever the live prompt changes, so
+local copies are easy to find and compare. These files are not synced to the
+scheduler automatically and will not be included in a fresh clone. See
+[Scheduled-task content tracking](SETUP.md#scheduled-task-content-tracking).

@@ -110,3 +110,57 @@ test('dates remain isolated and news refresh clears a stale custom headline', as
   assert.equal(rows[0].payload.emailAttention.length, 0);
   assert.equal(rows[1].payload.emailAttention.length, 1);
 });
+
+const linkedEmail = { ...email, obligationId: 'obligation-1', ticktickProjectId: 'pixelos', ticktickTaskId: 'task-1' };
+test('linked identities round-trip, reject partial/duplicate identities, and preserve prior snapshot on rejection', async () => {
+  const h = harness();
+  assert.equal((await h.post({ kind: 'email', payload: { emailAttention: [linkedEmail] } })).status, 200);
+  assert.equal([...h.daily.values()][0].payload.emailAttention[0].ticktickTaskId, 'task-1');
+  for (const items of [
+    [{ ...email, obligationId: 'partial' }],
+    [{ ...linkedEmail, ticktickTaskId: '' }],
+    [linkedEmail, { ...linkedEmail, ticktickTaskId: 'another' }],
+    [linkedEmail, { ...linkedEmail, obligationId: 'another' }],
+  ]) {
+    assert.equal((await h.post({ kind: 'email', payload: { emailAttention: items } })).status, 400);
+    assert.equal([...h.daily.values()][0].payload.emailAttention.length, 1);
+  }
+  assert.equal((await h.post({ payload: { topics: {}, emailAttention: [linkedEmail, linkedEmail] } })).status, 400);
+});
+
+test('linked email views ignore marks and encode TickTick IDs; legacy views retain marks', () => {
+  const data = load('src/lib/data.ts', { '@/lib/db': {}, '@/lib/digest-types': schemas, '@/lib/time': { keyToString: (d) => d.toISOString().slice(0, 10) } });
+  const { buildEmails } = load('src/lib/view.ts', {
+    '@/lib/data': data, '@/lib/digest-types': schemas,
+    '@/lib/time': { keyToString: (d) => d.toISOString().slice(0, 10) },
+  });
+  const day = new Date('2026-11-03');
+  const nextDay = new Date('2026-11-04');
+  assert.equal(data.emailKey(day, linkedEmail), data.emailKey(nextDay, linkedEmail));
+  const legacyKey = data.emailKey(day, email);
+  const views = buildEmails(day, [{ ...linkedEmail, ticktickTaskId: 'a/b?#' }, email], new Set([data.emailKey(day, linkedEmail), legacyKey]));
+  assert.equal(views[0].done, false);
+  assert.equal(views[0].taskUrl, 'https://ticktick.com/webapp/#p/pixelos/tasks/a%2Fb%3F%23');
+  assert.equal(views[1].done, true);
+  assert.equal(views[1].taskUrl, undefined);
+});
+
+test('email mark action rejects linked keys and old keys for linked items while preserving legacy actions', async () => {
+  let writes = 0;
+  const { setMark } = load('src/app/actions.ts', {
+    'next/cache': { refresh() {} }, '@/lib/auth': { getSession: async () => ({}) },
+    '@/lib/ticktick': {}, '@/lib/digest-types': schemas,
+    '@/lib/time': { isDateString: () => true, keyFromString: (s) => new Date(s) },
+    '@/lib/db': { db: {
+      briefing: { findUnique: async () => ({ payload: { topics: {}, emailAttention: [linkedEmail] } }) },
+      itemMark: { upsert: async () => { writes++; }, deleteMany: async () => { writes++; } },
+    } },
+  });
+  const input = { kind: 'email', date: '2026-11-03', on: true };
+  await assert.rejects(() => setMark({ ...input, key: 'email:obligation:obligation-1' }), /TickTick/);
+  await assert.rejects(() => setMark({ ...input, key: 'email:2026-11-03:A|Reply' }), /TickTick/);
+  assert.equal(writes, 0);
+  await setMark({ ...input, key: 'email:2026-11-03:B|Legacy' });
+  await setMark({ ...input, kind: 'deal', key: 'deal:example' });
+  assert.equal(writes, 2);
+});

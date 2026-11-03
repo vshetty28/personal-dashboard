@@ -8,18 +8,19 @@ import type { EmailView } from "@/lib/view";
 /**
  * Emails the agent flagged. Each card shows the full summary AND the call to
  * action; the countdown and the action box are the only orange on the card.
- * "Done" is stored server-side, so it's the same on every device.
+ * Linked obligations are completed in TickTick; legacy cards retain local marks.
  */
 export function NeedsYou({ emails, hasBriefing }: { emails: EmailView[]; hasBriefing: boolean }) {
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  const isDone = (e: EmailView) => overrides[e.key] ?? e.done;
+  const isDone = (e: EmailView) => e.taskUrl ? false : (overrides[e.key] ?? e.done);
   const open = emails.filter((e) => !isDone(e));
   const done = emails.filter(isDone);
 
   function toggle(e: EmailView) {
+    if (e.taskUrl) return;
     const next = !isDone(e);
     setOverrides((o) => ({ ...o, [e.key]: next }));
     setError(null);
@@ -71,14 +72,26 @@ export function NeedsYou({ emails, hasBriefing }: { emails: EmailView[]; hasBrie
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2.5">
                     <h3 className="text-[14.5px] leading-snug font-semibold md:text-[15px]">{e.subject}</h3>
-                    <button
-                      type="button"
-                      onClick={() => toggle(e)}
-                      aria-label={`Mark "${e.subject}" done`}
-                      className="-mt-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-lg border border-line-strong text-fg-2 hover:text-fg"
-                    >
-                      <Check className="size-3.5" strokeWidth={2.6} />
-                    </button>
+                    {e.taskUrl ? (
+                      <a
+                        href={e.taskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open "${e.subject}" in TickTick`}
+                        className="-mt-1 -mr-1 flex min-h-8 shrink-0 items-center justify-center rounded-lg border border-line-strong px-2 text-xs text-fg-2 hover:text-fg"
+                      >
+                        Open in TickTick
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => toggle(e)}
+                        aria-label={`Mark "${e.subject}" done`}
+                        className="-mt-1 -mr-1 flex size-8 shrink-0 items-center justify-center rounded-lg border border-line-strong text-fg-2 hover:text-fg"
+                      >
+                        <Check className="size-3.5" strokeWidth={2.6} />
+                      </button>
+                    )}
                   </div>
                   <div className="mt-0.5 text-xs text-dim md:text-[12.5px]">
                     {e.sender}

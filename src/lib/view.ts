@@ -29,6 +29,7 @@ export type EmailView = {
   /** Due within two days (or late): the countdown turns orange. */
   hot: boolean;
   done: boolean;
+  taskUrl?: string;
 };
 
 export function buildEmails(day: Date, items: EmailAttentionItem[], marks: Set<string>): EmailView[] {
@@ -60,7 +61,10 @@ export function buildEmails(day: Date, items: EmailAttentionItem[], marks: Set<s
       countdown,
       deadline: item.dueAt ? undefined : item.deadline,
       hot,
-      done: marks.has(key),
+      done: item.obligationId ? false : marks.has(key),
+      taskUrl: item.ticktickProjectId && item.ticktickTaskId
+        ? `https://ticktick.com/webapp/#p/${encodeURIComponent(item.ticktickProjectId)}/tasks/${encodeURIComponent(item.ticktickTaskId)}`
+        : undefined,
       sortKey,
     };
   });

@@ -45,6 +45,9 @@ export const marketsItemSchema = newsItemSchema.extend({
 });
 
 export const emailAttentionItemSchema = z.object({
+  obligationId: z.string().trim().min(1).max(200).optional(),
+  ticktickProjectId: z.string().trim().min(1).max(200).optional(),
+  ticktickTaskId: z.string().trim().min(1).max(200).optional(),
   sender: z.string(),
   subject: z.string(),
   /** What the email says / why it needs you. Shown in full on the card. */
@@ -59,6 +62,30 @@ export const emailAttentionItemSchema = z.object({
   deadline: z.string().optional(),
   /** Short category label, e.g. "Career", "School", "Housing". */
   category: z.string().optional(),
+}).superRefine((item, ctx) => {
+  const fields = ["obligationId", "ticktickProjectId", "ticktickTaskId"] as const;
+  if (fields.some((field) => item[field] !== undefined)) {
+    for (const field of fields) {
+      if (!item[field]) ctx.addIssue({ code: "custom", path: [field], message: "Linked emails require all three identity fields" });
+    }
+  }
+});
+
+const emailAttentionSchema = z.array(emailAttentionItemSchema).superRefine((items, ctx) => {
+  const obligations = new Set<string>();
+  const tasks = new Set<string>();
+  items.forEach((item, index) => {
+    const task = item.ticktickProjectId && item.ticktickTaskId
+      ? JSON.stringify([item.ticktickProjectId, item.ticktickTaskId]) : undefined;
+    if (item.obligationId && obligations.has(item.obligationId)) {
+      ctx.addIssue({ code: "custom", path: [index, "obligationId"], message: "Duplicate obligation" });
+    }
+    if (task && tasks.has(task)) {
+      ctx.addIssue({ code: "custom", path: [index, "ticktickTaskId"], message: "Duplicate TickTick task" });
+    }
+    if (item.obligationId) obligations.add(item.obligationId);
+    if (task) tasks.add(task);
+  });
 });
 
 export const HEADLINE_TONES = ["action", "weekend", ...BRIEFING_TOPICS] as const;
@@ -81,7 +108,7 @@ const dailyCoreSchema = z.object({
     sports: z.array(newsItemSchema).default([]),
   }),
   // Explicitly empty (not omitted) when there's nothing actionable.
-  emailAttention: z.array(emailAttentionItemSchema),
+  emailAttention: emailAttentionSchema,
 });
 
 export const promotionSchema = z.object({
@@ -136,7 +163,7 @@ export const briefingPayloadSchema = dailyCoreSchema.extend({
 });
 
 export const sourceIngestSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("email"), payload: z.object({ emailAttention: z.array(emailAttentionItemSchema) }).strict() }),
+  z.object({ kind: z.literal("email"), payload: z.object({ emailAttention: emailAttentionSchema }).strict() }),
   z.object({ kind: z.literal("news"), payload: z.object({ topics: dailyCoreSchema.shape.topics, headline: dailyCoreSchema.shape.headline }).strict() }),
   z.object({ kind: z.literal("research"), payload: z.object({ readings: z.array(readingSchema) }).strict() }),
   z.object({ kind: z.literal("deals"), payload: z.object({ promotions: z.array(promotionSchema) }).strict() }),

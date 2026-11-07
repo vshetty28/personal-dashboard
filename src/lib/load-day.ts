@@ -155,14 +155,22 @@ export async function loadDay(dateParam: string | string[] | undefined, opts: { 
       ? { label: "Must know", value: String(mustKnow.length), href: "#know", tone: "plain", badges: [...new Set(mustKnow.map((s) => s.topic))] }
       : { label: "Must know", value: "0", sub: briefing ? "Quiet news day" : "No briefing", href: "#briefing", tone: "calm" },
   );
-  if (weekendLive) {
+  if (weekendLive?.deals.length) {
     tiles.push({
-      label: "Deals & reading",
-      value: `${weekendLive.deals.length}+${weekendLive.reads.filter((r) => !r.done).length}`,
-      sub: "deals · unread reads",
-      href: "#weekend",
+      label: "Deals",
+      value: String(weekendLive.deals.length),
+      sub: "available offers",
+      href: "#deals",
       tone: "gold",
-      wide: tiles.length % 2 === 0,
+    });
+  }
+  if (weekendLive?.reads.length) {
+    tiles.push({
+      label: "Readings",
+      value: String(weekendLive.reads.filter((r) => !r.done).length),
+      sub: "unread readings",
+      href: "#readings",
+      tone: "plain",
     });
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,9 @@ function LoginForm() {
               {loading ? "Checking..." : "Enter"}
             </Button>
           </form>
+          <p className="mt-5 text-center text-xs text-muted-foreground">
+            <Link href="/privacy-policy" className="underline underline-offset-4 hover:text-foreground">Privacy policy</Link>
+          </p>
         </CardContent>
       </Card>
     </div>

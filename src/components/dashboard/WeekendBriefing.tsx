@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { OpenInAI } from "./OpenInAI";
 import { setMark } from "@/app/actions";
 import type { WeekendView } from "@/lib/view";
 
@@ -65,28 +66,15 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
   const unread = weekend.reads.filter((r) => !isRead(r.key, r.done)).length;
 
   return (
-    <section
-      id="weekend"
-      aria-label="Deals & reading"
-      className="-mx-1 mt-4 scroll-mt-6 rounded-2xl border border-gold-line bg-gold-bg py-4 pl-4 md:mx-0 md:px-[22px] md:pt-[18px]"
-    >
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pr-4 md:pr-0">
-        <span className="flex h-[21px] items-center rounded-[5px] bg-gold px-2 text-[10.5px] font-bold tracking-[0.08em] text-canvas">
-          FOR YOU
-        </span>
-        <h2 className="text-base font-semibold md:text-[17px]">Deals & reading</h2>
-        <span className="text-[12.5px] text-dim md:text-[13px]">{rangeLabel}</span>
-        <span className="text-[12.5px] text-dim md:ml-auto md:text-[13px]">
-          {deals.length} {deals.length === 1 ? "deal" : "deals"} · {unread} unread
-        </span>
-      </div>
-
-      <div className="mt-3.5 grid gap-4 md:grid-cols-[minmax(0,500px)_minmax(0,1fr)] md:gap-6">
-        {deals.length > 0 && (
-          <div className="min-w-0">
-            <div className="mb-1 text-[11px] font-semibold tracking-[0.1em] text-gold uppercase">Deals</div>
-            {/* Phone: a sideways rail of cards. Desktop: a list that scrolls past four. */}
-            <div className="scroll-gold flex gap-2.5 overflow-x-auto pr-4 pb-2.5 md:block md:max-h-[236px] md:overflow-x-visible md:overflow-y-auto md:pr-1.5 md:pb-0">
+    <div id="weekend" className="mt-4 space-y-4 scroll-mt-6">
+      {deals.length > 0 && (
+        <section id="deals" aria-label="Deals" className="min-w-0 scroll-mt-6 rounded-2xl border border-gold-line bg-gold-bg p-4 md:p-[22px]">
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-base font-semibold text-gold md:text-[17px]">Deals</h2>
+            <span className="text-[12.5px] text-dim">{rangeLabel}</span>
+            <span className="text-[12.5px] text-dim md:ml-auto">{deals.length} {deals.length === 1 ? "deal" : "deals"}</span>
+          </div>
+          <div className="scroll-gold flex gap-2.5 overflow-x-auto pb-2.5 md:block md:max-h-[236px] md:overflow-x-visible md:overflow-y-auto md:pr-1.5 md:pb-0">
               {deals.map((d) => (
                 <div
                   key={d.key}
@@ -136,21 +124,24 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
                   </div>
                 </div>
               ))}
-            </div>
           </div>
-        )}
-
-        {weekend.reads.length > 0 && (
-          <div className="min-w-0">
-            <div className="mb-2.5 text-[11px] font-semibold tracking-[0.1em] text-paper uppercase">Reading</div>
-            <div className="scroll-gold flex gap-3 overflow-x-auto pr-4 pb-2.5 md:pr-0">
+        </section>
+      )}
+      {weekend.reads.length > 0 && (
+        <section id="readings" aria-label="Readings" className="min-w-0 scroll-mt-6 rounded-2xl border border-line bg-surface p-4 md:p-[22px]">
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-base font-semibold md:text-[17px]">Readings</h2>
+            <span className="text-[12.5px] text-dim">{rangeLabel}</span>
+            <span className="text-[12.5px] text-dim md:ml-auto">{unread} unread</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {weekend.reads.map((r) => {
                 const done = isRead(r.key, r.done);
                 return (
                   <article
                     key={r.key}
                     className={
-                      "flex w-[230px] shrink-0 flex-col gap-2 rounded-xl bg-paper p-3.5 text-paper-ink md:w-[250px] md:p-4 " +
+                      "flex min-w-0 flex-col gap-2 rounded-xl bg-paper p-3.5 text-paper-ink md:p-4 " +
                       (done ? "opacity-55" : "")
                     }
                   >
@@ -171,20 +162,30 @@ export function WeekendBriefing({ weekend, rangeLabel }: { weekend: WeekendView;
                       </a>
                     </h3>
                     <p className="text-[12.5px] leading-snug text-[#4A463D] md:text-[13px]">{r.why}</p>
+                    <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => toggleRead(r.key, r.done)}
-                      className="mt-auto self-start rounded-md bg-paper-ink px-2.5 py-1.5 text-xs font-medium text-paper"
+                      className="self-start rounded-md bg-paper-ink px-2.5 py-1.5 text-xs font-medium text-paper"
                     >
                       {done ? "Mark unread" : "Mark read"}
                     </button>
+                    <OpenInAI prompt={[
+                      "Help me understand this reading and go deeper.",
+                      "",
+                      `Title: ${r.title}`,
+                      `Source: ${r.source} (${r.url})`,
+                      `Why it was recommended: ${r.why}`,
+                      "",
+                      "Use the source link to explain the main claims, evidence, limitations, and practical implications. Distinguish what the source says from your own analysis. If you cannot access it, say so and ask me to paste the text.",
+                    ].join("\n")} />
+                    </div>
                   </article>
                 );
               })}
-            </div>
           </div>
-        )}
-      </div>
-    </section>
+        </section>
+      )}
+    </div>
   );
 }

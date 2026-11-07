@@ -4,7 +4,7 @@ import { SESSION_COOKIE } from "@/lib/auth";
 
 // Routes reachable without a dashboard session.
 // The manifest and icon are fetched by the browser without cookies, so they must be public.
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/manifest.webmanifest", "/icon.svg"];
+const PUBLIC_PATHS = ["/privacy-policy", "/login", "/api/auth/login", "/manifest.webmanifest", "/icon.svg"];
 // These authenticate themselves via bearer token (INGEST_API_KEY / CRON_SECRET),
 // not the session cookie.
 const API_KEY_PATHS = ["/api/ingest", "/api/cron/"];
